@@ -11,14 +11,14 @@ using System.Web;
 
 namespace BlurWebBrowser.Services.Implementation
 {
-    public class GoogleApiWrapper
+    public class GoogleApiWrapper : IImageEngine
     {
         private VisionService _visionService;
-        private readonly IImageProcessingService _imageService;
-        public GoogleApiWrapper(IImageProcessingService imageService)
+        private readonly IImageRedactor _imageRedactor;
+        public GoogleApiWrapper(IImageRedactor imageRedactor)
         {
-            if (imageService == null) throw new ArgumentNullException(("imageService"));
-            _imageService = imageService;
+            if (imageRedactor == null) throw new ArgumentNullException(("imageRedactor"));
+            _imageRedactor = imageRedactor;
             Configure();
         }
 
@@ -32,13 +32,29 @@ namespace BlurWebBrowser.Services.Implementation
             });
         }
 
-        public IEnumerable<byte> BlurImages(IEnumerable<byte> inputImage)
+        public IEnumerable<byte> BlurImage(IEnumerable<byte> inputImage)
         {
+            if (inputImage == null) throw new ArgumentNullException(("inputImage"));
+
+            IEnumerable<byte> outputImageBytes = new List<byte>();
+
             int MAX_RESULTS = 90;
+            int blurLevel = 35;
 
-            IEnumerable<FaceAnnotation> faces = detectFaces(inputImage, MAX_RESULTS);
-            processFaces(inputImage, faces);
+            // TODO: test
+            string inputPath = @"C:\Users\Dmitry\Repositories\source.jpg";
+            inputImage = File.ReadAllBytes(inputPath);
 
+            // Detect all faces on input images with google api
+            IEnumerable<FaceAnnotation> faces = detectFaces(inputImage, MAX_RESULTS);                    
+
+            // Blur all faces images
+            IEnumerable<FaceImage> bluredFacesImages = blurFaces(inputImage, faces, blurLevel);
+
+            // Combine source image with blurred faces images
+            outputImageBytes = combine(inputImage, bluredFacesImages);
+
+            return outputImageBytes;
         }
 
         IEnumerable<FaceAnnotation> detectFaces(IEnumerable<byte> inputImage, int maxResults)
@@ -71,34 +87,68 @@ namespace BlurWebBrowser.Services.Implementation
             return response.FaceAnnotations;
         }
 
-        private void processFaces(IEnumerable<byte> inputImage, IEnumerable<FaceAnnotation> faces)
+        private IEnumerable<FaceImage> blurFaces(IEnumerable<byte> inputImageBytes, IEnumerable<FaceAnnotation> faces, int blurLevel)
         {
-            Bitmap img = new Bitmap(inputPath);          
+            var result = new List<FaceImage>();
+            Bitmap sourceImage;
+
+            // 4.1 Read source image
+            using (var ms = new MemoryStream(inputImageBytes.ToArray()))
+            {
+                sourceImage = new Bitmap(ms);
+            }
 
             foreach (FaceAnnotation face in faces)
             {
-                // 1.Get face location
-                var rect = createRectangelAroundFace(img, face);
+                var faceImage = new FaceImage()
+                    { Position = new Point(face.FdBoundingPoly.Vertices[0].X.Value, face.FdBoundingPoly.Vertices[0].Y.Value) };
+                // 1. Create rectangl with face location
+                var rect = createRectangleAroundFace(face);
 
                 // 2. Create image with face
                 System.Drawing.Image bmp = new Bitmap(rect.Width + 40, rect.Height + 50);
-                                               
+                Graphics g = Graphics.FromImage(bmp);
+                // Draw the given area (section) of the source image
+                // at location 0,0 on the empty bitmap (bmp)
+                g.DrawImage(sourceImage, 0, 0, rect, GraphicsUnit.Pixel);
 
-                // 3. Blur
-                ImageConverter converter = new ImageConverter();
+                // 3. Blur face image
+                var converter = new ImageConverter();
                 var bytes = (byte[])converter.ConvertTo(bmp, typeof(byte[]));
-                Bitmap bitMap = _imageService.BlurImage(bytes, 35);
-
-                //Effects.DrawPoly(img, face);
-
-                // 4. Insert blurred face image into source image
-                Graphics gr = Graphics.FromImage(img);
-                gr.DrawImage(bitMap, new Point(face.FdBoundingPoly.Vertices[0].X.Value, face.FdBoundingPoly.Vertices[0].Y.Value));
-
+                faceImage.Content = _imageRedactor.BlurImage(bytes, blurLevel);
+                result.Add(faceImage);
             }
+
+            return result;
         }
 
-        private static Rectangle createRectangelAroundFace(Bitmap img, FaceAnnotation face)
+        private IEnumerable<byte> combine(IEnumerable<byte> inputImageBytes, IEnumerable<FaceImage> blurredFaces)
+        {
+            IEnumerable<byte> result = new List<byte>();
+            Bitmap sourceImage;
+
+            using (var ms = new MemoryStream(inputImageBytes.ToArray()))
+            {
+                sourceImage = new Bitmap(ms);
+            }
+            Graphics gr = Graphics.FromImage(sourceImage);
+
+            foreach (var blurredFace in blurredFaces)
+            {                             
+                gr.DrawImage(blurredFace.Content, blurredFace.Position);     
+            }
+
+            // TODO: test
+            sourceImage.Save(@"C:\Users\Dmitry\Repositories\new.jpg");
+
+            var converter = new ImageConverter();
+            // 4.3 Convert to bytes
+            result = (byte[])converter.ConvertTo(gr, typeof(byte[]));
+
+            return result;
+        }
+
+        private Rectangle createRectangleAroundFace(FaceAnnotation face)
         {
             Rectangle rectangle;           
 
@@ -107,7 +157,6 @@ namespace BlurWebBrowser.Services.Implementation
             var width = face.FdBoundingPoly.Vertices[1].X - face.FdBoundingPoly.Vertices[0].X;
             var height = face.FdBoundingPoly.Vertices[2].Y - face.FdBoundingPoly.Vertices[1].Y;
             rectangle = new Rectangle(firstPointX.Value, firstPointY.Value, width.Value, height.Value);
-
 
             return rectangle;
         }

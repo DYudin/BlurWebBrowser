@@ -5,7 +5,8 @@ using System.Web;
 
 namespace BlurWebBrowser.Services.Abstract
 {
-    public class IGoogleApiWrapper
+    public interface IImageEngine
     {
+        IEnumerable<byte> BlurImage(IEnumerable<byte> inputImage);
     }
 }

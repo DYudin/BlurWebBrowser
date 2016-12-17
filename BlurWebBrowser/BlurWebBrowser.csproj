@@ -128,10 +128,11 @@
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\Abstract\IGoogleApiWrapper.cs" />
-    <Compile Include="Services\Abstract\IImageProcessingService.cs" />
+    <Compile Include="Services\Abstract\IImageEngine.cs" />
+    <Compile Include="Services\Abstract\IImageRedactor.cs" />
+    <Compile Include="Services\Implementation\FaceImage.cs" />
     <Compile Include="Services\Implementation\GoogleApiWrapper.cs" />
-    <Compile Include="Services\Implementation\ImageProcessingService.cs" />
+    <Compile Include="Services\Implementation\ImageRedactor.cs" />
     <Compile Include="ViewModels\ImageViewModel.cs" />
   </ItemGroup>
   <ItemGroup>

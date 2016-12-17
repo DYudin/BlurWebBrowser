@@ -1,24 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Web.Http;
 using BlurWebBrowser.ViewModels;
 using System.Threading.Tasks;
+using BlurWebBrowser.Services.Abstract;
 
 namespace BlurWebBrowser.Controllers
 {
     public class ImageController : ApiController
     {
-        private readonly IGoogleApiWrapper _wrapper;
+        private readonly IImageEngine _imageEngine;
 
-        public TransactionController(
-            IGoogleApiWrapper wrapper)
+        public ImageController(
+            IImageEngine imageEngine)
         {
-            if (wrapper == null) throw new ArgumentNullException(("wrapper"));
-            
-            _wrapper = wrapper;      
+            if (imageEngine == null) throw new ArgumentNullException(("imageEngine"));
+
+            _imageEngine = imageEngine;      
         }
 
         [Route("api/image/blurimages")]
@@ -35,6 +34,10 @@ namespace BlurWebBrowser.Controllers
                     processedImages.Add(processedImage);
                 }
             } 
+            catch
+            {
+
+            }
             finally
             {
                 // TODO
@@ -45,14 +48,14 @@ namespace BlurWebBrowser.Controllers
 
         private Task<ImageViewModel> blurImageInternal(ImageViewModel imageVM)
         {
+            var processedImageVM = new ImageViewModel();
+
             return Task.Run(() =>
             {
                 // call services
-
-
-
-                return new ImageViewModel();
-
+                processedImageVM.Data = _imageEngine.BlurImage(imageVM.Data).ToArray();
+              
+                return processedImageVM;
             });      
         }
     }

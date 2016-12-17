@@ -6,10 +6,10 @@ using System.Web;
 
 namespace BlurWebBrowser.Services.Abstract
 {
-    public interface IImageProcessingService
+    public interface IImageRedactor
     {
-        Bitmap BlurImage(byte[] bytes, int blurLevel);
-             
+        Bitmap BlurImage(IEnumerable<byte> inputImage, int blurLevel);
+              
 
         //public static void DrawPoly(Bitmap img, FaceAnnotation face)
         //{
