@@ -31,27 +31,30 @@ namespace BlurWebBrowser.Services.Implementation
             });
         }
 
-        public IEnumerable<byte> BlurImage(IEnumerable<byte> inputImage)
+        public IEnumerable<byte> BlurImage(IEnumerable<byte> inputImageBytes)
         {
-            if (inputImage == null) throw new ArgumentNullException(("inputImage"));
+            if (inputImageBytes == null) throw new ArgumentNullException(("inputImageBytes"));
 
             IEnumerable<byte> outputImageBytes = new List<byte>();
 
-            int MAX_RESULTS = 90;
-            int blurLevel = 35;
+            int MAX_RESULTS = 100;
+            int blurLevel = 30;
 
-            // TODO: test
-            string inputPath = @"C:\Users\Dmitry\Repositories\source.jpg";
-            inputImage = File.ReadAllBytes(inputPath);
+            
+            using (var ms = new MemoryStream(inputImageBytes.ToArray()))
+            {
+                using (Bitmap sourceImage = new Bitmap(ms))
+                {
+                    // Detect all faces on input images with google api
+                    IEnumerable<FaceAnnotation> faces = detectFaces(inputImageBytes, MAX_RESULTS);
 
-            // Detect all faces on input images with google api
-            IEnumerable<FaceAnnotation> faces = detectFaces(inputImage, MAX_RESULTS);                    
+                    // Blur all faces images
+                    IEnumerable<FaceImage> bluredFacesImages = blurFaces(sourceImage, faces, blurLevel);
 
-            // Blur all faces images
-            IEnumerable<FaceImage> bluredFacesImages = blurFaces(inputImage, faces, blurLevel);
-
-            // Combine source image with blurred faces images
-            outputImageBytes = combine(inputImage, bluredFacesImages);
+                    // Combine source image with blurred faces images
+                    outputImageBytes = combine(sourceImage, bluredFacesImages);
+                }                    
+            }         
 
             return outputImageBytes;
         }
@@ -86,61 +89,52 @@ namespace BlurWebBrowser.Services.Implementation
             return response.FaceAnnotations;
         }
 
-        private IEnumerable<FaceImage> blurFaces(IEnumerable<byte> inputImageBytes, IEnumerable<FaceAnnotation> faces, int blurLevel)
+        private IEnumerable<FaceImage> blurFaces(Bitmap inputImage, IEnumerable<FaceAnnotation> faces, int blurLevel)
         {
-            var result = new List<FaceImage>();
-            Bitmap sourceImage;
-
-            // 4.1 Read source image
-            using (var ms = new MemoryStream(inputImageBytes.ToArray()))
-            {
-                sourceImage = new Bitmap(ms);
-            }
+            var result = new List<FaceImage>();          
 
             foreach (FaceAnnotation face in faces)
-            {
+            {    
                 var faceImage = new FaceImage()
-                    { Position = new Point(face.FdBoundingPoly.Vertices[0].X.Value, face.FdBoundingPoly.Vertices[0].Y.Value) };
+                { Position = new Point(face.FdBoundingPoly.Vertices[0].X.Value, face.FdBoundingPoly.Vertices[0].Y.Value) };
                 // 1. Create rectangl with face location
                 var rect = createRectangleAroundFace(face);
 
-                // 2. Create image with face
-                System.Drawing.Image bmp = new Bitmap(rect.Width + 40, rect.Height + 50);
-                Graphics g = Graphics.FromImage(bmp);
-                g.DrawImage(sourceImage, 0, 0, rect, GraphicsUnit.Pixel);
+                // 2. Create image with face               
+                using (System.Drawing.Image bmp = new Bitmap(rect.Width, rect.Height))
+                {
+                    using (Graphics gr = Graphics.FromImage(bmp))
+                    {
+                        gr.DrawImage(inputImage, 0, 0, rect, GraphicsUnit.Pixel);
+                    }
 
-                // 3. Blur face image
-                var converter = new ImageConverter();
-                var bytes = (byte[])converter.ConvertTo(bmp, typeof(byte[]));
-                faceImage.Content = _imageRedactor.BlurImage(bytes, blurLevel);
-                result.Add(faceImage);
+                    var converter = new ImageConverter();
+                    var bytes = (byte[])converter.ConvertTo(bmp, typeof(byte[]));
+
+                    // 3. Blur face image
+                    faceImage.Content = _imageRedactor.BlurImage(bytes, blurLevel);
+                    result.Add(faceImage);
+                }
             }
 
             return result;
         }
 
-        private IEnumerable<byte> combine(IEnumerable<byte> inputImageBytes, IEnumerable<FaceImage> blurredFaces)
+        private IEnumerable<byte> combine(Bitmap inputImage, IEnumerable<FaceImage> blurredFaces)
         {
             IEnumerable<byte> result = new List<byte>();
-            Bitmap sourceImage;
 
-            using (var ms = new MemoryStream(inputImageBytes.ToArray()))
+            using (Graphics gr = Graphics.FromImage(inputImage))
             {
-                sourceImage = new Bitmap(ms);
-            }
-            Graphics gr = Graphics.FromImage(sourceImage);
-
-            foreach (var blurredFace in blurredFaces)
-            {                             
-                gr.DrawImage(blurredFace.Content, blurredFace.Position);     
-            }
-
-            // TODO: test
-            sourceImage.Save(@"C:\Users\Dmitry\Repositories\new.jpg");
-
+                foreach (var blurredFace in blurredFaces)
+                {
+                    gr.DrawImage(blurredFace.Content, blurredFace.Position);
+                }
+            }           
+          
             var converter = new ImageConverter();
             // 4.3 Convert to bytes
-            result = (byte[])converter.ConvertTo(gr, typeof(byte[]));
+            result = (byte[])converter.ConvertTo(inputImage, typeof(byte[]));           
 
             return result;
         }
