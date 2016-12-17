@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Web;
 
 namespace BlurWebBrowser.Services.Implementation
 {
@@ -15,7 +14,6 @@ namespace BlurWebBrowser.Services.Implementation
         {
             if (inputImage == null) throw new ArgumentNullException(("inputImage"));
 
-            //IEnumerable<byte> bluredImage;
             Bitmap bitMap;
 
             using (MemoryStream inStream = new MemoryStream(inputImage.ToArray()))
@@ -30,15 +28,11 @@ namespace BlurWebBrowser.Services.Implementation
                             .Save(outStream);
                     }
 
-                    //bluredImage = outStream.ToArray();
-                    
-                      bitMap = new Bitmap(outStream);
+                    bitMap = new Bitmap(outStream);
                 }
             }
 
             return bitMap;
-
-            //return bluredImage;
         }    
     }
 }

@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Web;
 
 namespace BlurWebBrowser.Services.Implementation
 {
@@ -108,8 +107,6 @@ namespace BlurWebBrowser.Services.Implementation
                 // 2. Create image with face
                 System.Drawing.Image bmp = new Bitmap(rect.Width + 40, rect.Height + 50);
                 Graphics g = Graphics.FromImage(bmp);
-                // Draw the given area (section) of the source image
-                // at location 0,0 on the empty bitmap (bmp)
                 g.DrawImage(sourceImage, 0, 0, rect, GraphicsUnit.Pixel);
 
                 // 3. Blur face image
